@@ -1,0 +1,37 @@
+#include <iostream>
+#include "Room.h"
+#include "Player.h"
+#include "TaskManager.h"
+#include "GameEngine.h"
+
+using namespace std;
+
+int main() {
+    cout << "=== UNIT TEST: ROOM ===" << endl;
+    Room r1(1, "Foyer", "Dimly lit entrance hall.", "Low", true, "Muddy boot print near stairs.");
+    r1.addConnection("North", 2);
+    r1.addHiddenPassage("Behind Grandfather Clock");
+    r1.displayRoomInfo();
+
+    cout << "\n=== UNIT TEST: PLAYER ===" << endl;
+    Player p1("Jaden", 1, 100);
+    p1.addClue(r1.getClueText());
+    p1.modifySanity(-20);
+    p1.moveToRoom(2);
+    cout << "Player: " << p1.getPlayerName() << " | Room: " << p1.getCurrentRoomID()
+         << " | Sanity: " << p1.getSanityScore() << " | Alive: " << p1.isAlive() << endl;
+
+    cout << "\n=== UNIT TEST: TASKMANAGER ===" << endl;
+    TaskManager t1(101, "Fuse Box Bypass", 512, 10, 25);
+    cout << "Wrong code (111): " << t1.evaluateTaskInput(111) << endl;
+    t1.triggerPenalty(p1);
+    cout << "Sanity after penalty: " << p1.getSanityScore() << endl;
+    cout << "Right code (512): " << t1.evaluateTaskInput(512) << endl;
+
+    cout << "\n=== UNIT TEST: GAMEENGINE ===" << endl;
+    GameEngine engine;
+    engine.startNewGame();
+    cout << "Engine running: " << engine.isGameRunning() << endl;
+
+    return 0;
+}

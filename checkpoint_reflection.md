@@ -5,9 +5,30 @@
 ## Checkpoint-01: Initial project structure / setup
 
 1. What challenges did you encounter?
-Setting up the repository template and configuring `.vscode/tasks.json` to compile multiple `.cpp` files together using `"*.cpp",` required verifying the build task settings.
+
+# Setting up the multi-file C++ compilation workflow in VS Code on macOS required adjusting `.vscode/tasks.json` to compile for the  `*.cpp` instead of only a single active file and switching the output path from a Windows `.exe` executable to a macOS binary (`./main`).
+
+2. What design decisions or changes did you make?
+
+# For this I chanaged how I organized the project root cleanly into a separate header (.h) and used (.cpp) files for the four core classes Room, Player, TaskManager, and GameEngine, alongside dedicated CSV and DAT data files. Those were, rooms_init.csv, tasks_init.csv, and savegame.dat. 
+
+## checkpoint-02: class declaration
+
+1. What challenges did you encounter?
+
+# I faced trying to translate my Phase II UML diagram into a C++ header file while making sure to include guards (`#ifndef`/`#define`/`#endif`), using consistent lowercase `.h` file naming, and avoiding circular header dependencies between `TaskManager`, `Player`, and `GameEngine` which required careful organization.
 
 
 2. What design decisions or changes did you make?
-I created empty header, source, and data files for my four planned classes (`Room`, `Player`, `TaskManager`, `GameEngine`) and three CSV/DAT files (`rooms_init.csv`, `tasks_init.csv`, `savegame.dat`) to establish a clean modular structure from the start.
 
+# I kept all member variables `private` to enforce encapsulation, used inline definitions for simple single-instruction getters / setters, and added a `clueText` attribute to `Room` and a `taskList` vector to `GameEngine` so external CSV data would map cleanly to objects.
+
+## checkpoint-03: class definition
+
+1. What challenges did you encounter?
+
+# I encountered trying to ensure every function definition in the `.cpp` source files matched the exact parameter types and `const` qualifiers which were declared in the `.h` headers, while properly monitoring the player's sanity score between 0 and 100, required when testing.
+
+2. What design decisions or changes did you make?
+
+# I prevented duplicate clue entries inside `Player::addClue()`, through the 0–100 bounds inside `Player::setSanityScore()`, and verified every class constructor and method using a standalone unit test in `main.cpp` before renaming it to `maintest.txt`.
