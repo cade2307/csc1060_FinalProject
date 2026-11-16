@@ -32,3 +32,13 @@
 2. What design decisions or changes did you make?
 
 # I prevented duplicate clue entries inside `Player::addClue()`, through the 0–100 bounds inside `Player::setSanityScore()`, and verified every class constructor and method using a standalone unit test in `main.cpp` before renaming it to `maintest.txt`.
+
+## checkpoint-04: program structure integration and input validation
+
+1. What challenges did you encounter?
+
+# I had trouble with preventing infinite input loops when non-numeric characters (such as letters or symbols) were entered into `std::cin` during menu selection which required clearing the stream error flags like (`cin.clear()`). This then led to flushing the input buffer (`cin.ignore()`).
+
+2. What design decisions or changes did you make?
+
+# I modularized the menu workflow into dedicated `printMenu()`, `validateMenuOption()`, and `getUserMenuOption()` methods inside `GameEngine` so the menu loop remained clean. It also rejects out-of-range or non-integer inputs.

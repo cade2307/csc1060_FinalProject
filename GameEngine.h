@@ -31,6 +31,11 @@ public:
     Player getCurrentPlayer() const { return currentPlayer; }
     bool isGameRunning() const { return gameRunning; }
 
+    // Menu & Input Validation Helpers (Checkpoint 04)
+    void printMenu() const;
+    int getUserMenuOption() const;
+    bool validateMenuOption(int option) const;
+
     // Core Methods
     void runMainMenu();
     void startNewGame();
