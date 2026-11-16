@@ -1,10 +1,14 @@
 /*
  * Name: Jaden Ramirez
  * File Summary: Puts in GameEngine class member functions, including main
- *               menu navigation and user input validation.
+ *               menu navigation and user input validation. Also Runs the
+ *                main menu, story gameplay loop, CSV world loading,
+ *               and savegame.dat persistence for game.
  */
 
 #include "GameEngine.h"
+#include <fstream>
+#include <sstream>
 #include <limits>
 #include <cctype>
 
@@ -18,7 +22,7 @@ void GameEngine::printMenu() const {
     cout << "       WHISPERS IN THE PASSAGEWAYS        " << endl;
     cout << "==========================================" << endl;
     cout << "1. Start New Investigation" << endl;
-    cout << "2. Load Saved Investigation (Checkpoint 06)" << endl;
+    cout << "2. Load Saved Investigation" << endl;
     cout << "3. How to Play / Rules" << endl;
     cout << "4. Exit Game" << endl;
     cout << "------------------------------------------" << endl;
@@ -31,24 +35,26 @@ bool GameEngine::validateMenuOption(int option) const {
 int GameEngine::getUserMenuOption() const {
     int choice = 0;
     while (true) {
-        cout << "Select an option (1-4): ";
+        cout << "Choose an option (1-4): ";
         if (cin >> choice && validateMenuOption(choice)) {
             cin.ignore(numeric_limits<streamsize>::max(), '\n');
             return choice;
         }
-        cout << "[Invalid Input] Please enter a number between 1 and 4." << endl;
+        cout << "Please enter a valid number from 1 to 4." << endl;
         cin.clear();
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
     }
 }
 
 void GameEngine::displayRules() const {
-    cout << "\n--- HOW TO PLAY ---" << endl;
-    cout << "- Move between rooms using N, S, E, or W." << endl;
-    cout << "- Press F to search the current room for clues." << endl;
-    cout << "- Press T to attempt a 3-digit precision task and stabilize sanity." << endl;
-    cout << "- Press C to view your investigator status and collected clues." << endl;
-    cout << "- Press A when ready to accuse the killer (Human or Specter)." << endl;
+    cout << "\n--- INVESTIGATOR HANDBOOK ---" << endl;
+    cout << "You are trapped inside Blackwood Manor after a midnight murder." << endl;
+    cout << "- Move between rooms with N, S, E, or W." << endl;
+    cout << "- Press F to search a room for clues." << endl;
+    cout << "- Press T to solve a 3-digit task and steady your nerves." << endl;
+    cout << "- Press C to check your sanity and clue notebook." << endl;
+    cout << "- Press S to save your progress." << endl;
+    cout << "- Press A when you are ready to accuse: Human or Specter." << endl;
     cout << "- Press Q to return to the main menu." << endl;
 }
 
@@ -57,61 +63,199 @@ void GameEngine::runMainMenu() {
     while (inMenu) {
         printMenu();
         int option = getUserMenuOption();
-        switch (option) {
-            case 1:
-                startNewGame();
-                break;
-            case 2:
-                cout << "\n[System] Save/Load File I/O will be connected in Checkpoint 06." << endl;
-                break;
-            case 3:
-                displayRules();
-                break;
-            case 4:
-                cout << "\nExiting Whispers in the Passageways. Stay safe..." << endl;
-                inMenu = false;
-                gameRunning = false;
-                break;
+
+        if (option == 1) {
+            startNewGame();
+        } else if (option == 2) {
+            loadGame("savegame.dat");
+            if (gameRunning) {
+                runGameLoop();
+            }
+        } else if (option == 3) {
+            displayRules();
+        } else if (option == 4) {
+            cout << "\nYou step back into the fog. Until next time..." << endl;
+            inMenu = false;
+            gameRunning = false;
         }
     }
 }
 
-void GameEngine::initializeDefaultWorld() {
+void GameEngine::loadRooms(string filename) {
     worldMap.clear();
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cout << "[Notice] " << filename << " not found. Using backup manor room." << endl;
+        return;
+    }
+
+    string line;
+    while (getline(file, line)) {
+        if (line.empty()) continue;
+
+        stringstream ss(line);
+        string idText, name, desc, threat, clueFlag, clue, exits, passage;
+
+        getline(ss, idText, ',');
+        getline(ss, name, ',');
+        getline(ss, desc, ',');
+        getline(ss, threat, ',');
+        getline(ss, clueFlag, ',');
+        getline(ss, clue, ',');
+        getline(ss, exits, ',');
+        getline(ss, passage);
+
+        if (idText.empty() || name.empty()) continue;
+
+        Room room(stoi(idText), name, desc, threat, stoi(clueFlag) == 1, clue);
+
+        // Read exits like "N:2|E:3"
+        stringstream exitReader(exits);
+        string oneExit;
+        while (getline(exitReader, oneExit, '|')) {
+            size_t split = oneExit.find(':');
+            if (split != string::npos) {
+                string dir = oneExit.substr(0, split);
+                int nextRoom = stoi(oneExit.substr(split + 1));
+                room.addConnection(dir, nextRoom);
+            }
+        }
+
+        if (!passage.empty() && passage != "None") {
+            room.addHiddenPassage(passage);
+        }
+
+        worldMap.push_back(room);
+    }
+    file.close();
+}
+
+void GameEngine::loadTasks(string filename) {
     taskList.clear();
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cout << "[Notice] " << filename << " not found. Using backup task." << endl;
+        return;
+    }
 
-    Room foyer(1, "Grand Foyer", "A cold, marble-floored entrance hall with flickering sconces.", "Low", true,
-               "Sub-zero frost patterns spiral outward from the lock without any footprints.");
-    foyer.addConnection("N", 2);
-    foyer.addConnection("E", 3);
+    string line;
+    while (getline(file, line)) {
+        if (line.empty()) continue;
 
-    Room library(2, "Archive Library", "Towering oak bookshelves packed with occult and estate ledgers.", "Medium", true,
-                 "A heavy iron candelabra passed straight through the torn wallpaper.");
-    library.addConnection("S", 1);
-    library.addConnection("E", 4);
-    library.addHiddenPassage("Behind the Rotating Atlas");
+        stringstream ss(line);
+        string idText, name, codeText, timeText, penaltyText;
 
-    Room conservatory(3, "Glass Conservatory", "Overgrown ferns under shattered skylights dripping with rain.", "Medium", true,
-                      "The victim's pocket watch stopped at 3:14 AM and is magnetized.");
-    conservatory.addConnection("W", 1);
-    conservatory.addConnection("N", 4);
+        getline(ss, idText, ',');
+        getline(ss, name, ',');
+        getline(ss, codeText, ',');
+        getline(ss, timeText, ',');
+        getline(ss, penaltyText);
 
-    Room cellar(4, "Sub-Basement Cellar", "Damp stone walls echoing with rhythmic whispers.", "High", true,
-                "Ectoplasmic residue coats the sealed vault door from the inside.");
-    cellar.addConnection("W", 2);
-    cellar.addConnection("S", 3);
-    cellar.addHiddenPassage("Narrow Maintenance Tunnel");
+        if (idText.empty() || name.empty()) continue;
 
-    worldMap.push_back(foyer);
-    worldMap.push_back(library);
-    worldMap.push_back(conservatory);
-    worldMap.push_back(cellar);
+        TaskManager task(stoi(idText), name, stoi(codeText), stoi(timeText), stoi(penaltyText));
+        taskList.push_back(task);
+    }
+    file.close();
+}
 
-    taskList.push_back(TaskManager(1, "Breaker Box Alignment (Enter code: 427)", 427, 15, 20));
-    taskList.push_back(TaskManager(2, "EMF Frequency Lock (Enter code: 739)", 739, 15, 25));
-    taskList.push_back(TaskManager(3, "Vault Tumbler Override (Enter code: 814)", 814, 15, 30));
+void GameEngine::initializeDefaultWorld() {
+    loadRooms("rooms_init.csv");
+    if (worldMap.empty()) {
+        Room fallback(1, "Grand Foyer", "A quiet, shadowy entrance hall.", "Low", true,
+                      "Frost covers the inside of the front door lock.");
+        worldMap.push_back(fallback);
+    }
+
+    loadTasks("tasks_init.csv");
+    if (taskList.empty()) {
+        taskList.push_back(TaskManager(1, "Reset the Flickering Breaker Box (Enter code: 427)", 427, 15, 20));
+    }
 
     killerIsSpecter = true;
+}
+
+void GameEngine::saveGame(string filename) {
+    ofstream file(filename);
+    if (!file.is_open()) {
+        cout << "[Error] Could not save your notebook to " << filename << "." << endl;
+        return;
+    }
+
+    file << currentPlayer.getPlayerName() << endl;
+    file << currentPlayer.getCurrentRoomID() << endl;
+    file << currentPlayer.getSanityScore() << endl;
+    file << currentPlayer.getTasksCompletedCount() << endl;
+
+    vector<string> clues = currentPlayer.getCollectedClues();
+    file << clues.size() << endl;
+    for (size_t i = 0; i < clues.size(); i++) {
+        file << clues[i] << endl;
+    }
+
+    file << taskList.size() << endl;
+    for (size_t i = 0; i < taskList.size(); i++) {
+        file << (taskList[i].isTaskActive() ? 1 : 0) << endl;
+    }
+
+    file.close();
+    cout << "\n[Saved] Your investigation notes have been written to " << filename << "." << endl;
+}
+
+void GameEngine::loadGame(string filename) {
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cout << "\n[Notice] No save file found yet. Start a new investigation first!" << endl;
+        gameRunning = false;
+        return;
+    }
+
+    string name;
+    if (!getline(file, name) || name.empty()) {
+        cout << "\n[Notice] Your save file is empty. Start a new investigation first!" << endl;
+        file.close();
+        gameRunning = false;
+        return;
+    }
+
+    int roomID = 1, sanity = 100, tasksDone = 0;
+    if (!(file >> roomID >> sanity >> tasksDone)) {
+        cout << "\n[Error] Save file could not be read." << endl;
+        file.close();
+        gameRunning = false;
+        return;
+    }
+    file.ignore(numeric_limits<streamsize>::max(), '\n');
+
+    initializeDefaultWorld();
+    currentPlayer = Player(name, roomID, sanity);
+    currentPlayer.setTasksCompletedCount(tasksDone);
+
+    size_t clueCount = 0;
+    if (file >> clueCount) {
+        file.ignore(numeric_limits<streamsize>::max(), '\n');
+        for (size_t i = 0; i < clueCount; i++) {
+            string clueLine;
+            if (getline(file, clueLine) && !clueLine.empty()) {
+                currentPlayer.addClue(clueLine);
+            }
+        }
+    }
+
+    size_t savedTasks = 0;
+    if (file >> savedTasks) {
+        for (size_t i = 0; i < savedTasks && i < taskList.size(); i++) {
+            int active = 1;
+            if (file >> active) {
+                taskList[i].setTaskActive(active == 1);
+            }
+        }
+    }
+
+    file.close();
+    gameRunning = true;
+    cout << "\n[Loaded] You open your journal and step back into the manor, "
+         << currentPlayer.getPlayerName() << "..." << endl;
 }
 
 Room* GameEngine::findRoomByID(int id) {
@@ -125,7 +269,7 @@ Room* GameEngine::findRoomByID(int id) {
 
 void GameEngine::startNewGame() {
     string name;
-    cout << "\nEnter your investigator name: ";
+    cout << "\nEnter your detective's name: ";
     getline(cin, name);
     if (name.empty()) {
         name = "Investigator";
@@ -135,22 +279,25 @@ void GameEngine::startNewGame() {
     currentPlayer = Player(name, 1, 100);
     gameRunning = true;
 
-    cout << "\nWelcome, " << currentPlayer.getPlayerName() << ". The manor doors lock behind you..." << endl;
+    cout << "\nThunder rolls outside Blackwood Manor as the heavy oak doors slam shut behind you, "
+         << currentPlayer.getPlayerName() << "." << endl;
+    cout << "Someone—or something—is still inside. Find the truth before your nerve breaks." << endl;
+
     runGameLoop();
 }
 
 void GameEngine::runGameLoop() {
     while (gameRunning && currentPlayer.isAlive()) {
-        Room* activeRoom = findRoomByID(currentPlayer.getCurrentRoomID());
-        if (activeRoom != nullptr) {
-            activeRoom->displayRoomInfo();
+        Room* room = findRoomByID(currentPlayer.getCurrentRoomID());
+        if (room != nullptr) {
+            room->displayRoomInfo();
         }
 
         cout << "\n[Sanity: " << currentPlayer.getSanityScore()
              << "/100 | Clues: " << currentPlayer.getCollectedClues().size()
              << " | Tasks Solved: " << currentPlayer.getTasksCompletedCount() << "]" << endl;
-        cout << "Actions: [N/S/E/W] Move | [F] Search Clue | [T] Precision Task | [C] Status | [A] Accuse | [Q] Quit" << endl;
-        cout << "Enter command: ";
+        cout << "Commands: [N/S/E/W] Move | [F] Search | [T] Task | [C] Notebook | [S] Save | [A] Accuse | [Q] Quit" << endl;
+        cout << "What do you do? ";
 
         char cmd;
         cin >> cmd;
@@ -158,125 +305,112 @@ void GameEngine::runGameLoop() {
         processAction(toupper(cmd));
 
         if (!currentPlayer.isAlive()) {
-            cout << "\n[GAME OVER] Your sanity has shattered in the dark..." << endl;
+            cout << "\n[GAME OVER] The whispers overwhelm your mind. You collapse in the dark..." << endl;
             gameRunning = false;
         }
     }
 }
 
 void GameEngine::processAction(char command) {
-    Room* activeRoom = findRoomByID(currentPlayer.getCurrentRoomID());
-    if (activeRoom == nullptr) {
-        return;
-    }
+    Room* room = findRoomByID(currentPlayer.getCurrentRoomID());
+    if (room == nullptr) return;
 
     if (command == 'N' || command == 'S' || command == 'E' || command == 'W') {
         string dir(1, command);
-        map<string, int> exits = activeRoom->getConnectedRooms();
+        map<string, int> exits = room->getConnectedRooms();
+
         if (exits.count(dir)) {
             currentPlayer.moveToRoom(exits[dir]);
-            cout << "You move " << dir << " into the next chamber..." << endl;
+            cout << "\nYour footsteps echo as you slip through the " << dir << " doorway..." << endl;
         } else {
-            cout << "[Blocked] There is no exit in that direction." << endl;
+            cout << "\nA locked wall blocks your path in that direction." << endl;
         }
     } else if (command == 'F') {
-        if (activeRoom->getHasClue()) {
-            cout << "[Clue Found] " << activeRoom->getClueText() << endl;
-            currentPlayer.addClue(activeRoom->getClueText());
+        if (room->getHasClue()) {
+            cout << "\n[Clue Discovered] " << room->getClueText() << endl;
+            cout << "You jot the detail down in your notebook." << endl;
+            currentPlayer.addClue(room->getClueText());
         } else {
-            cout << "You search carefully, but find no new evidence here." << endl;
+            cout << "\nYou search the shadows, but find nothing unusual here." << endl;
         }
     } else if (command == 'T') {
-        bool foundActive = false;
         for (size_t i = 0; i < taskList.size(); i++) {
             if (taskList[i].isTaskActive()) {
-                foundActive = true;
-                cout << "\n[PRECISION TASK] " << taskList[i].getTaskName() << endl;
-                cout << "Enter 3-digit calibration code: ";
+                cout << "\n[Task] " << taskList[i].getTaskName() << endl;
+                cout << "Enter the 3-digit code: ";
+
                 int code;
                 if (!(cin >> code)) {
                     cin.clear();
                     cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                    cout << "[Failed] Invalid input! Sanity penalty triggered." << endl;
+                    cout << "Your hands shake and the wires spark! (-"
+                         << taskList[i].getSanityPenalty() << " Sanity)" << endl;
                     taskList[i].triggerPenalty(currentPlayer);
                     return;
                 }
                 cin.ignore(numeric_limits<streamsize>::max(), '\n');
 
                 if (taskList[i].evaluateTaskInput(code)) {
-                    cout << "[Success] System stabilized! (+10 Sanity)" << endl;
+                    cout << "Click! The mechanism hums smoothly. (+10 Sanity)" << endl;
                     currentPlayer.incrementTasksCompleted();
                     currentPlayer.modifySanity(10);
                 } else {
-                    cout << "[Failed] Incorrect sequence! (-" << taskList[i].getSanityPenalty() << " Sanity)" << endl;
+                    cout << "Wrong code! A chilling whisper echoes behind you. (-"
+                         << taskList[i].getSanityPenalty() << " Sanity)" << endl;
                     taskList[i].triggerPenalty(currentPlayer);
                 }
-                break;
+                return;
             }
         }
-        if (!foundActive) {
-            cout << "All manor precision tasks are already stabilized!" << endl;
-        }
+        cout << "\nEvery device in the manor is already stabilized!" << endl;
     } else if (command == 'C') {
-        cout << "\n=== INVESTIGATOR DOSSIER ===" << endl;
-        cout << "Name: " << currentPlayer.getPlayerName() << endl;
+        cout << "\n=== DETECTIVE NOTEBOOK ===" << endl;
+        cout << "Investigator: " << currentPlayer.getPlayerName() << endl;
         cout << "Sanity: " << currentPlayer.getSanityScore() << "/100" << endl;
         cout << "Tasks Completed: " << currentPlayer.getTasksCompletedCount() << endl;
+
         vector<string> clues = currentPlayer.getCollectedClues();
-        cout << "Collected Clues (" << clues.size() << "):" << endl;
+        cout << "Clues Collected (" << clues.size() << "):" << endl;
         if (clues.empty()) {
-            cout << "  - None yet." << endl;
+            cout << "  - None yet. Try searching rooms with [F]." << endl;
         } else {
             for (size_t i = 0; i < clues.size(); i++) {
                 cout << "  * " << clues[i] << endl;
             }
         }
+    } else if (command == 'S') {
+        saveGame("savegame.dat");
     } else if (command == 'A') {
         makeFinalAccusation();
     } else if (command == 'Q') {
-        cout << "Returning to main menu..." << endl;
+        cout << "\nStepping back to the main menu..." << endl;
         gameRunning = false;
     } else {
-        cout << "[Invalid Command] Use N, S, E, W, F, T, C, A, or Q." << endl;
+        cout << "\nUnknown command. Try N, S, E, W, F, T, C, S, A, or Q." << endl;
     }
 }
 
 void GameEngine::makeFinalAccusation() {
-    cout << "\n=== FINAL ACCUSATION ===" << endl;
-    cout << "Clues gathered: " << currentPlayer.getCollectedClues().size() << "/4" << endl;
-    cout << "Who is responsible for the murders? (1 = Human, 2 = Specter): ";
+    cout << "\n=== THE FINAL ACCUSATION ===" << endl;
+    cout << "You gather your notes (" << currentPlayer.getCollectedClues().size() << "/4 clues found)." << endl;
+    cout << "Who committed the murder at Blackwood Manor? (1 = Human, 2 = Specter): ";
+
     int choice;
     if (!(cin >> choice) || (choice != 1 && choice != 2)) {
         cin.clear();
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
-        cout << "[Cancelled] Invalid selection. Gather your thoughts and try again." << endl;
+        cout << "You hesitate and lower your lantern. Keep investigating first." << endl;
         return;
     }
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
 
     bool accusedSpecter = (choice == 2);
     if (accusedSpecter == killerIsSpecter && currentPlayer.getCollectedClues().size() >= 2) {
-        cout << "\n[VICTORY] You proved the killer is a Specter and banished it from the manor!" << endl;
+        cout << "\n[CASE SOLVED] With solid proof of paranormal frost and magnetism, you banish the Specter!" << endl;
     } else if (accusedSpecter == killerIsSpecter) {
-        cout << "\n[PARTIAL ENDING] Your instinct was right, but without at least 2 clues, no one believes you." << endl;
+        cout << "\n[UNSOLVED] You guessed Specter correctly, but without at least 2 clues, nobody believes your story." << endl;
     } else {
-        cout << "\n[DEFEAT] Wrong accusation! The true Specter emerges from the passageways..." << endl;
+        cout << "\n[CASE FAILED] It wasn't a human at all. Cold mist pours from the hidden passageways..." << endl;
     }
     gameRunning = false;
-}
-
-void GameEngine::loadRooms(string filename) {
-    cout << "Loading rooms from " << filename << endl;
-}
-
-void GameEngine::loadTasks(string filename) {
-    cout << "Loading tasks from " << filename << endl;
-}
-
-void GameEngine::saveGame(string filename) {
-    cout << "Saving game to " << filename << endl;
-}
-
-void GameEngine::loadGame(string filename) {
-    cout << "Loading game from " << filename << endl;
 }
