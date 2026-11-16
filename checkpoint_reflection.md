@@ -42,3 +42,13 @@
 2. What design decisions or changes did you make?
 
 # I modularized the menu workflow into dedicated `printMenu()`, `validateMenuOption()`, and `getUserMenuOption()` methods inside `GameEngine` so the menu loop remained clean. It also rejects out-of-range or non-integer inputs.
+
+## checkpoint-05: incorporate objects into program flow
+
+1. What challenges did you encounter?
+
+# This was a lot more difficult then I thought it was going to be in coordinating state updates across `Player`, `Room`, and `TaskManager` inside `GameEngine::processAction()`. Specifically in matching directional exits from `Room::getConnectedRooms()` and applying sanity penalties through in the `TaskManager::triggerPenalty(Player&)` because it required careful pointer and reference handling.
+
+2. What design decisions or changes did you make?
+
+# For the design I created `initializeDefaultWorld()` and `runGameLoop()` inside `GameEngine` to populate the initial `vector<Room>` and `vector<TaskManager>` collections in the memory. This allowed full movement, clue gathering, precision tasks, and accusation endings to be tested before thinking ahead to connecting external CSV/DAT File I/O which i will need ot do in the next checkpoint.

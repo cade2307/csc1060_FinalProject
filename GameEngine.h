@@ -23,6 +23,7 @@ private:
     vector<TaskManager> taskList;
     Player currentPlayer;
     bool gameRunning;
+    bool killerIsSpecter;
 
 public:
     GameEngine();
@@ -35,6 +36,11 @@ public:
     void printMenu() const;
     int getUserMenuOption() const;
     bool validateMenuOption(int option) const;
+
+    // Gameplay Helpers (Checkpoint 05)
+    void initializeDefaultWorld();
+    void runGameLoop();
+    Room* findRoomByID(int id);
 
     // Core Methods
     void runMainMenu();
