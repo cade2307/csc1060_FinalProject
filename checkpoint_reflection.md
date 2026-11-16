@@ -52,3 +52,13 @@
 2. What design decisions or changes did you make?
 
 # For the design I created `initializeDefaultWorld()` and `runGameLoop()` inside `GameEngine` to populate the initial `vector<Room>` and `vector<TaskManager>` collections in the memory. This allowed full movement, clue gathering, precision tasks, and accusation endings to be tested before thinking ahead to connecting external CSV/DAT File I/O which i will need ot do in the next checkpoint.
+
+## checkpoint-06: file io / data persistence
+
+1. What challenges did you encounter?
+
+# This go arround I had trouble reading comma-separated room data and pipe-separated exit pairs from `rooms_init.csv` and `tasks_init.csv` when using a `std::stringstream`, while making sure missing or empty `savegame.dat` files still returned players safely to the main menu instead of crashing (it liked to do that), I stopped that with stream state checks.
+
+2. What design decisions or changes did you make?
+
+# I implemented `loadRooms()` and `loadTasks()` using `ifstream` and `stringstream` with built-in fallback data where if the CSV files are missing i then added an in-game `[S]` Save command paired with `saveGame()` and `loadGame()` so the investigator's name, current room, sanity score, collected clues, and task states stay the same across separate runs.
